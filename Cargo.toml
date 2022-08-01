@@ -23,5 +23,8 @@ core-graphics = "0.22"
 [dependencies]
 tokio = { optional = true, version = "1", features = ["time"] }
 
+[dev-dependencies]
+lazy_static = "1.4"
+
 [profile.release]
 lto = true
