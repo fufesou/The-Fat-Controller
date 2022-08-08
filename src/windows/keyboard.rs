@@ -1,6 +1,6 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, ptr::null_mut};
 
-use winapi::{um::winuser::{INPUT_u, KEYBDINPUT, VkKeyScanA, VkKeyScanExW, GetKeyboardLayout, GetKeyboardLayoutList, ToUnicodeEx, GetKeyState}, shared::minwindef::{HKL}};
+use winapi::{um::winuser::{INPUT_u, KEYBDINPUT, VkKeyScanA, VkKeyScanExW, GetKeyboardLayout, GetKeyboardLayoutList, ToUnicodeEx, GetKeyState, GetWindowThreadProcessId, GetForegroundWindow}, shared::minwindef::{HKL}};
 
 use crate::Key;
 use super::{ffi::{self, VkKeyScanW, DWORD, WORD}, Context, Error};
@@ -192,10 +192,12 @@ fn char_event(ctx: &Context, ch: char, down: bool, up: bool) -> Result<(), Error
     }
 
     let layout = unsafe {
-        GetKeyboardLayout(0)
+        let current_window_thread_id = GetWindowThreadProcessId(GetForegroundWindow(), null_mut());
+        GetKeyboardLayout(current_window_thread_id)
     };
 
     let res = unsafe { VkKeyScanExW(ch as _, layout) };
+    dbg!(layout, res);
     let (vk, scan, flags): (i32, u16, u16) = if (res >> 8) & 0xFF == 0 {
         let vk = (res & 0xFF) as i32;
         // Without dead key
