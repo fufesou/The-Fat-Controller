@@ -3,7 +3,7 @@ use std::{
     thread,
     time::Duration,
 };
-use tfc::{traits::*, Context, Error};
+use tfc::{traits::*, Context, Error, Key};
 
 // `unicode_char('s')` should always type an `s` no matter what the keyboard
 // layout is. `ascii_char(b's')` will press the key in the position of an `s` on
@@ -31,8 +31,22 @@ fn main() -> Result<(), Error> {
     //     ctx.ascii_char(b'\n')?;
     // }
 
-    let c = 'A'; // â Q q ¡(shift+altgr) ^ \\
-    KBD_CONTEXT.lock().unwrap().unicode_char(c as char)?;
+    KBD_CONTEXT.lock().unwrap().key_down(Key::Shift);
+    KBD_CONTEXT.lock().unwrap().unicode_char_down('q');
+    KBD_CONTEXT.lock().unwrap().unicode_char_up('q');
+    KBD_CONTEXT.lock().unwrap().key_up(Key::Shift);
+    
+
+    // let c = 'b'; // â Q q ¡(shift+altgr) ^ \\
+    // KBD_CONTEXT.lock().unwrap().unicode_char(c as char)?;
+    
+    // KBD_CONTEXT.lock().unwrap().unicode_char_down(c as char)?;
+
+    // use std::{thread, time::Duration};
+    // thread::sleep(Duration::from_millis(4000));
+
+    // KBD_CONTEXT.lock().unwrap().unicode_char_up(c as char)?;
+    // dbg!(KBD_CONTEXT.lock().unwrap().key_map.get(&c));
 
     Ok(())
 }

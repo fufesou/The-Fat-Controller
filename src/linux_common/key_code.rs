@@ -6,11 +6,11 @@ pub fn to_key_code(key: Key) -> u16 {
     match key {
         CapsLock => KEY_CAPSLOCK,
         Shift => KEY_LEFTSHIFT,
-        Control | ControlOrMeta => KEY_LEFTCTRL,
+        Control => KEY_LEFTCTRL,
         Alt => KEY_LEFTALT,
         Meta => KEY_LEFTMETA,
         RightShift => KEY_RIGHTSHIFT,
-        RightControl | RightControlOrMeta => KEY_RIGHTCTRL,
+        RightControl => KEY_RIGHTCTRL,
         RightAlt => KEY_RIGHTALT,
         RightMeta => KEY_RIGHTMETA,
         Fn => KEY_RESERVED,
@@ -31,6 +31,8 @@ pub fn to_key_code(key: Key) -> u16 {
         Comma => KEY_COMMA,
         Period => KEY_DOT,
         Slash => KEY_SLASH,
+        IntlBackslash => KEY_102ND, // TODO
+        Apps => KEY_COMPOSE,        // TODO: ???
         UpArrow => KEY_UP,
         RightArrow => KEY_RIGHT,
         DownArrow => KEY_DOWN,
@@ -39,6 +41,12 @@ pub fn to_key_code(key: Key) -> u16 {
         PageDown => KEY_PAGEDOWN,
         Home => KEY_HOME,
         End => KEY_END,
+        Insert => KEY_INSERT,
+        Print => KEY_PRINT,
+        PrintScreen => KEY_SYSRQ,   // TODO: ???
+        ScrollLock => KEY_SCROLLLOCK,// TODO
+        Pause => KEY_PAUSE,         // TODO
+        NumLock => KEY_NUMLOCK,
         A => KEY_A,
         B => KEY_B,
         C => KEY_C,

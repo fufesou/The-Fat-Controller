@@ -1,6 +1,6 @@
 use crate::{Key, linux_common};
 use super::{ffi, Context, Error, KeyInfo, PlatformError};
-use std::{thread, time::Duration, os::raw::{c_int, c_uint}};
+use std::{time::{Duration}, os::raw::{c_int, c_uint}};
 
 fn key_event(ctx: &Context, key: Key, down: bool) -> Result<(), Error> {
     unsafe {
@@ -32,8 +32,9 @@ impl crate::KeyboardContext for Context {
 // delay only at the point where the layout changes doesn't work.
 const KEY_DELAY: Duration = Duration::from_millis(25);
 
-fn info_from_char(ctx: &Context, ch: char) -> Option<KeyInfo> {
-    if let Some(info) = ctx.key_map.get(&ch) {
+fn info_from_char(ctx: &Context, group: u8, ch: char) -> Option<KeyInfo> {
+    let key_map: &std::collections::HashMap<char, KeyInfo> = ctx.key_map_vec.get(group as usize).unwrap();
+    if let Some(info) = key_map.get(&ch) {
         return Some(*info);
     }
 
@@ -136,31 +137,24 @@ unsafe fn key_with_mods_event(ctx: &Context, info: &KeyInfo, down: bool) -> Resu
 
     // Remember the old group then switch to the new group.
     
-    let old_group = {
-        let mut state = std::mem::zeroed();
-        ffi::XkbGetState(ctx.display, ffi::XkbUseCoreKbd, &mut state);
-        state.group
-    };
-    if info.group != old_group {
-        ffi::XkbLockGroup(ctx.display, ffi::XkbUseCoreKbd, info.group as c_uint);
-    }
-
-    let old_modifiers = get_current_modifiers(ctx).unwrap_or(0) as u8;
+    // TODO
+    // // TODO: Need to optimize to improve response speed.
+    // let old_modifiers = get_current_modifiers(ctx).unwrap_or(0) as u8;
     
-    let is_shift = old_modifiers & 1 == 1;   // ShiftMask
-    let is_capslock = old_modifiers & 2 == 2;   // LockMask
-    let is_altgr = old_modifiers & 128 == 128;  // Mod5Mask
-    // Keep modifers is 0
-    if is_capslock && down{
-        modifier_event(ctx, 2, ffi::True)?;
-        modifier_event(ctx, 2, ffi::False)?;
-    }
-    if is_shift && down{
-        modifier_event(ctx, 1, ffi::False)?;
-    }
-    if is_altgr && down{
-        modifier_event(ctx, 128, ffi::False)?;
-    }
+    // let is_shift = old_modifiers & 1 == 1;   // ShiftMask
+    // let is_capslock = old_modifiers & 2 == 2;   // LockMask
+    // let is_altgr = old_modifiers & 128 == 128;  // Mod5Mask
+    // // Keep modifers is 0
+    // if is_capslock && down{
+    //     modifier_event(ctx, 2, ffi::True)?;
+    //     modifier_event(ctx, 2, ffi::False)?;
+    // }
+    // if is_shift && down{
+    //     modifier_event(ctx, 1, ffi::False)?;
+    // }
+    // if is_altgr && down{
+    //     modifier_event(ctx, 128, ffi::False)?;
+    // }
 
     // Press the modifiers before.
     if info.modifiers != 0 && down {
@@ -177,20 +171,19 @@ unsafe fn key_with_mods_event(ctx: &Context, info: &KeyInfo, down: bool) -> Resu
         modifier_event(ctx, info.modifiers, ffi::False)?;
     }
 
-    // The layout is automatically restored as the user types.
-    // Switching back to the old group now that we're done.
-    // if info.group != old_group {
-    //     dbg!(ffi::XkbLockGroup(ctx.display, ffi::XkbUseCoreKbd, old_group as c_uint));
-    // }
-
+    ffi::XFlush(ctx.display);
     ffi::XSync(ctx.display, ffi::False);
-    // thread::sleep(KEY_DELAY);
 
     Ok(())
 }
 
 fn char_event(ctx: &Context, ch: char, down: bool, up: bool) -> Result<(), Error> {
-    let info = match info_from_char(ctx, ch) {
+    let group = unsafe{
+        let mut state = std::mem::zeroed();
+        ffi::XkbGetState(ctx.display, ffi::XkbUseCoreKbd, &mut state);
+        state.group
+    };
+    let info = match info_from_char(ctx, group, ch) {
         Some(info) => info,
         None => return Err(Error::UnsupportedUnicode(ch)),
     };
@@ -198,6 +191,7 @@ fn char_event(ctx: &Context, ch: char, down: bool, up: bool) -> Result<(), Error
     unsafe {
         // If a keysym is not on the default keyboard mapping, we remap the
         // unused keycode.
+        // TODO: insert into the key_map
         if !info.default {
             ffi::XChangeKeyboardMapping(
                 ctx.display,
@@ -206,8 +200,17 @@ fn char_event(ctx: &Context, ch: char, down: bool, up: bool) -> Result<(), Error
                 &info.keysym,
                 1,
             );
-            ffi::XSync(ctx.display, ffi::False);
         }
+
+        // let old_group = {
+        //     let mut state = std::mem::zeroed();
+        //     ffi::XkbGetState(ctx.display, ffi::XkbUseCoreKbd, &mut state);
+        //     state.group
+        // };
+        
+        // if info.group != old_group {
+        //     ffi::XkbLockGroup(ctx.display, ffi::XkbUseCoreKbd, info.group as c_uint);
+        // }
 
         if down {
             key_with_mods_event(ctx, &info, true)?;
@@ -215,12 +218,6 @@ fn char_event(ctx: &Context, ch: char, down: bool, up: bool) -> Result<(), Error
         if up {
             key_with_mods_event(ctx, &info, false)?;
         }
-
-        if !info.default {
-            ffi::XSync(ctx.display, ffi::False);
-        }
-
-        // The keyboard mapping is reset inside Drop.
     }
 
     Ok(())
@@ -240,14 +237,14 @@ impl crate::UnicodeKeyboardContext for Context {
     }
 
     fn unicode_string(&mut self, s: &str) -> Result<(), Error> {
-        for ch in s.chars() {
-            if info_from_char(self, ch).is_none() {
-                return Err(Error::UnsupportedUnicode(ch));
-            }
-        }
-        for ch in s.chars() {
-            self.unicode_char(ch)?;
-        }
+        // for ch in s.chars() {
+        //     if info_from_char(self, ch).is_none() {
+        //         return Err(Error::UnsupportedUnicode(ch));
+        //     }
+        // }
+        // for ch in s.chars() {
+        //     self.unicode_char(ch)?;
+        // }
         Ok(())
     }
 }
