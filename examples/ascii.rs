@@ -32,8 +32,8 @@ fn main() -> Result<(), Error> {
     // }
 
     KBD_CONTEXT.lock().unwrap().key_down(Key::Shift);
-    KBD_CONTEXT.lock().unwrap().unicode_char_down('q');
-    KBD_CONTEXT.lock().unwrap().unicode_char_up('q');
+    KBD_CONTEXT.lock().unwrap().unicode_char_down('1');
+    KBD_CONTEXT.lock().unwrap().unicode_char_up('1');
     KBD_CONTEXT.lock().unwrap().key_up(Key::Shift);
     
 
