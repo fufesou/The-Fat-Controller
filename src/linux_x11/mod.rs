@@ -141,9 +141,8 @@ unsafe fn create_key_map(
     num_groups = num_groups - 1;
     ////////////////////////////////////////////////////////////////
     let mut key_map_vec :Vec<std::collections::HashMap<char, KeyInfo>> = Vec::with_capacity(num_groups.into());
-    for i in 0..num_groups.into() {
-        let mut key_map = HashMap::new();
-        key_map_vec.push(key_map);
+    for _i in 0..num_groups.into() {
+        key_map_vec.push(HashMap::new());
     }
 
     for keycode in min_keycode..=max_keycode {
@@ -151,7 +150,11 @@ unsafe fn create_key_map(
         // groups represents all keyboard layouts.
         for group in 0..groups {
             let key_map = if group < num_groups.into(){
-                key_map_vec.get_mut(group as usize).unwrap()
+                match key_map_vec.get_mut(group as usize) {
+                    Some(key_map) => key_map,
+                    // None is unreachable
+                    None => return Err(Error::Unknown),
+                }
             }else{
                 break;
             };
@@ -193,8 +196,6 @@ unsafe fn create_key_map(
             
         }
     }
-
-    println!("REMOVE ME ======================== {:?}", &key_map_vec);
 
     ffi::XkbFreeClientMap(desc, 0, ffi::True);
 
