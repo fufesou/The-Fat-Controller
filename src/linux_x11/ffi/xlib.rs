@@ -43,7 +43,7 @@ unsafe impl Sync for XModifierKeymap {}
 unsafe impl Send for XModifierKeymap {}
 
 #[link(name = "X11")]
-extern {
+extern "C" {
     // https://www.x.org/releases/X11R7.5/doc/man/man3/XOpenDisplay.3.html
     pub fn XOpenDisplay(display_name: *const u8) -> *mut Display;
 
@@ -80,7 +80,7 @@ extern {
         win_y_return: *mut c_int,
         mask_return: *mut c_uint,
     ) -> Bool;
-    
+
     // https://www.x.org/releases/X11R7.5/doc/man/man3/XWarpPointer.3.html
     pub fn XWarpPointer(
         display: *mut Display,
@@ -93,10 +93,10 @@ extern {
         dest_x: c_int,
         dest_y: c_int,
     ) -> c_int;
-    
+
     // https://www.x.org/releases/X11R7.5/doc/man/man3/XSync.3.html
     pub fn XSync(display: *mut Display, discard: Bool) -> c_int;
-    
+
     // https://www.x.org/releases/current/doc/man/man3/XFlush.3.xhtml
     pub fn XFlush(display: *mut Display) -> c_int;
 
