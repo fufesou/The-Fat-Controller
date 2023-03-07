@@ -1,5 +1,5 @@
-mod ffi;
 mod error;
+mod ffi;
 mod keyboard;
 mod mouse;
 mod screen;
@@ -46,7 +46,7 @@ unsafe fn no_xtest(display: *mut ffi::Display) -> bool {
         &mut event_base,
         &mut error_base,
         &mut major_version,
-        &mut minor_version
+        &mut minor_version,
     ) == ffi::False
 }
 
@@ -55,7 +55,6 @@ unsafe fn find_unused_key_code(
     min_keycode: ffi::KeyCode,
     max_keycode: ffi::KeyCode,
 ) -> Result<ffi::KeyCode, Error> {
-
     // Get the full mapping from keycodes to keysyms. There may be
     // multiple keysyms for each keycode depending on which modifiers
     // are pressed. We need this for finding an unused keycode, that is
@@ -78,9 +77,7 @@ unsafe fn find_unused_key_code(
     // on the default keyboard layout.
     for code_idx in 0..keycode_count {
         let sym_idx = code_idx as usize * keysyms_per_keycode;
-        let slice = std::slice::from_raw_parts(
-            keysyms.add(sym_idx), keysyms_per_keycode
-        );
+        let slice = std::slice::from_raw_parts(keysyms.add(sym_idx), keysyms_per_keycode);
         if slice.iter().all(|keysym| *keysym == ffi::NoSymbol) {
             ffi::XFree(keysyms);
             return Ok(code_idx + min_keycode);
@@ -96,7 +93,6 @@ unsafe fn create_key_map(
     min_keycode: ffi::KeyCode,
     max_keycode: ffi::KeyCode,
 ) -> Result<Vec<std::collections::HashMap<char, KeyInfo>>, Error> {
-
     // Fuck, this library is so inconsistent. Sometimes a keycode is a
     // KeyCode and sometimes it's an int. Sometimes a group is an int
     // and sometimes it's an unsigned int or even an unsigned char.
@@ -111,14 +107,13 @@ unsafe fn create_key_map(
     // key state identify a single keysym.
     // See https://tronche.com/gui/x/xlib/input/keyboard-encoding.html
 
+    use std::collections::hash_map::{Entry, HashMap};
     use std::os::raw::c_uint;
-    use std::collections::hash_map::{HashMap, Entry};
 
     let desc = ffi::XkbGetMap(display, ffi::XkbAllClientInfoMask, ffi::XkbUseCoreKbd);
     if desc.is_null() {
         return Err(Error::Platform(PlatformError::XkbGetMap));
     }
-
 
     ////////////////////////////////////////////////////////////////
     use x11::xlib;
@@ -161,10 +156,12 @@ unsafe fn create_key_map(
             };
             let key_type = ffi::XkbKeyKeyType(desc, keycode, group);
             for level in 0..(*key_type).num_levels {
-                let keysym = ffi::XkbKeycodeToKeysym(display, keycode, group as c_uint, level as c_uint);
+                let keysym =
+                    ffi::XkbKeycodeToKeysym(display, keycode, group as c_uint, level as c_uint);
                 let mut modifiers = 0;
 
-                let maps = std::slice::from_raw_parts((*key_type).map, (*key_type).map_count as usize);
+                let maps =
+                    std::slice::from_raw_parts((*key_type).map, (*key_type).map_count as usize);
                 for map in maps {
                     if map.active == ffi::True && map.level == level {
                         modifiers = map.mods.mask;
@@ -194,7 +191,6 @@ unsafe fn create_key_map(
                     });
                 }
             }
-            
         }
     }
 
