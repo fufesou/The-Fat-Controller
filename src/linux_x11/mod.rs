@@ -133,22 +133,25 @@ unsafe fn create_key_map(
         }
         num_groups += 1;
     }
-    num_groups = num_groups - 1;
+    // to-do: Ensure the comment out the following line is ok.
+    // num_groups = num_groups - 1;
     ////////////////////////////////////////////////////////////////
-    let mut key_map_vec: Vec<std::collections::HashMap<char, KeyInfo>> =
-        Vec::with_capacity(num_groups.into());
+    let mut key_map_vec :Vec<std::collections::HashMap<char, KeyInfo>> = Vec::with_capacity(num_groups.into());
     for _i in 0..num_groups.into() {
-        let key_map = HashMap::new();
-        key_map_vec.push(key_map);
+        key_map_vec.push(HashMap::new());
     }
 
     for keycode in min_keycode..=max_keycode {
         let groups = ffi::XkbKeyNumGroups(desc, keycode);
         // groups represents all keyboard layouts.
         for group in 0..groups {
-            let key_map = if group < num_groups.into() {
-                key_map_vec.get_mut(group as usize).unwrap()
-            } else {
+            let key_map = if group < num_groups.into(){
+                match key_map_vec.get_mut(group as usize) {
+                    Some(key_map) => key_map,
+                    // None is unreachable
+                    None => return Err(Error::Unknown),
+                }
+            }else{
                 break;
             };
             let key_type = ffi::XkbKeyKeyType(desc, keycode, group);
