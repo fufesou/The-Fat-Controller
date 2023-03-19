@@ -114,7 +114,7 @@ unsafe fn create_key_map(
     // key state identify a single keysym.
     // See https://tronche.com/gui/x/xlib/input/keyboard-encoding.html
 
-    use std::collections::hash_map::{Entry};
+    use std::collections::hash_map::Entry;
     use std::os::raw::c_uint;
 
     let desc = ffi::XkbGetMap(display, ffi::XkbAllClientInfoMask, ffi::XkbUseCoreKbd);
@@ -306,6 +306,7 @@ impl Context {
             .iter()
             .for_each(|(_, keycode)| change_keyboard_mapping(self.display, *keycode, NoSymbol));
         self.remap_keysym.clear();
+        self.unused_index = 0;
     }
 }
 
