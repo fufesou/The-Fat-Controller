@@ -7,7 +7,9 @@ mod screen;
 // The implementation of Context::new is adapted from here:
 // https://github.com/jordansissel/xdotool/blob/master/xdo.c
 
-use self::ffi::XKeycodeToKeysym;
+use crate::linux_x11::ffi::NoSymbol;
+
+use self::ffi::{Display, XKeycodeToKeysym};
 use error::PlatformError;
 use std::{collections::HashMap, ffi::c_int};
 type Error = crate::GenericError<PlatformError>;
@@ -33,6 +35,7 @@ pub struct Context {
     unused_index: u32,
     remap_keysym: HashMap<u64, ffi::KeyCode>,
     modifier_map: *const ffi::XModifierKeymap,
+    last_group: u8,
 }
 
 unsafe impl Sync for Context {}
@@ -111,7 +114,7 @@ unsafe fn create_key_map(
     // key state identify a single keysym.
     // See https://tronche.com/gui/x/xlib/input/keyboard-encoding.html
 
-    use std::collections::hash_map::{Entry, HashMap};
+    use std::collections::hash_map::Entry;
     use std::os::raw::c_uint;
 
     let desc = ffi::XkbGetMap(display, ffi::XkbAllClientInfoMask, ffi::XkbUseCoreKbd);
@@ -129,14 +132,7 @@ unsafe fn create_key_map(
     (*keyboard).dpy = ndisplay;
     xlib::XkbGetNames(ndisplay, XKB_ALL_NAMES_MASK, keyboard);
     xlib::XkbGetControls(ndisplay, XKB_ALL_CTRLS_MASK, keyboard);
-    let mut num_groups: u8 = 0;
-    let group_source = (*(*keyboard).names).groups;
-    for group in group_source.iter() {
-        if *group == 0 {
-            break;
-        }
-        num_groups += 1;
-    }
+    let num_groups: u8 = (*(*keyboard).names).groups.len() as u8;
     // to-do: Ensure the comment out the following line is ok.
     // num_groups = num_groups - 1;
     ////////////////////////////////////////////////////////////////
@@ -147,9 +143,7 @@ unsafe fn create_key_map(
     }
 
     for keycode in min_keycode..=max_keycode {
-        let groups = ffi::XkbKeyNumGroups(desc, keycode);
-        // groups represents all keyboard layouts.
-        for group in 0..groups {
+        for group in 0..(num_groups as i32) {
             let key_map = if group < num_groups.into() {
                 match key_map_vec.get_mut(group as usize) {
                     Some(key_map) => key_map,
@@ -256,6 +250,7 @@ impl Context {
                 unused_index: Default::default(),
                 remap_keysym: Default::default(),
                 modifier_map,
+                last_group: 0,
             })
         }
     }
@@ -272,15 +267,13 @@ impl Context {
     }
 
     pub fn remapping(&mut self, keysym: u64) -> Result<ffi::KeyCode, Error> {
-        let keycode = if let Some(keycode) = self.get_unused_keycode(){
+        let keycode = if let Some(keycode) = self.get_unused_keycode() {
             keycode
-        }else{
+        } else {
             return Err(Error::Info("Not found unused keycode".into()));
         };
 
-        unsafe {
-            ffi::XChangeKeyboardMapping(self.display, keycode as c_int, 1, keysym as _, 1);
-        }
+        change_keyboard_mapping(self.display, keycode, keysym);
         if self.is_valid_remapping(keysym, keycode) {
             self.remap_keysym.insert(keysym, keycode);
             Ok(keycode)
@@ -307,12 +300,28 @@ impl Context {
             None
         }
     }
+
+    pub fn recover_remapped_keycodes(&mut self) {
+        self.remap_keysym
+            .iter()
+            .for_each(|(_, keycode)| change_keyboard_mapping(self.display, *keycode, NoSymbol));
+        self.remap_keysym.clear();
+        self.unused_index = 0;
+    }
+}
+
+#[inline]
+fn change_keyboard_mapping(display: *mut Display, keycode: u8, keysym: u64) {
+    unsafe {
+        ffi::XChangeKeyboardMapping(display, keycode as c_int, 1, &keysym, 1);
+        ffi::XSync(display, ffi::False);
+    }
 }
 
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            // FIXME: Clear remapped keycodes.
+            self.recover_remapped_keycodes();
             ffi::XFreeModifiermap(self.modifier_map);
             ffi::XCloseDisplay(self.display);
         }
